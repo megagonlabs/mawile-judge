@@ -1,0 +1,546 @@
+{% extends "layout.html" %}
+{% block title %}Configure · MAWILE{% endblock %}
+
+{% macro role_fields(label, provider_field, provider_value, model_field, model_value, decoding_field, decoding_text, model_help='', is_override=false) %}
+  <div class="field-grid two">
+    <label>{{ label }} provider
+      <input name="{{ provider_field }}" value="{{ provider_value }}" {% if is_override %}placeholder="Inherit perturbation generator"{% endif %}>
+    </label>
+    <label>{% if model_help %}<span class="label-row">{{ label }} model <span class="help-icon" tabindex="0" data-tip="{{ model_help }}" aria-label="{{ model_help }}">?</span></span>{% else %}{{ label }} model{% endif %}
+      <input name="{{ model_field }}" value="{{ model_value }}" {% if is_override %}placeholder="Inherit perturbation generator"{% endif %}>
+    </label>
+  </div>
+  <details class="disclosure embedded-disclosure">
+    <summary>
+      <span class="summary-icon"><svg class="icon sm"><use href="#i-sliders"/></svg></span>
+      <span class="summary-text"><span class="eyebrow">{{ label }} decoding parameters</span></span>
+      <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+    </summary>
+    <div class="disclosure-body">
+      <textarea class="mono" name="{{ decoding_field }}" rows="3">{{ decoding_text }}</textarea>
+      {% if is_override %}<p class="muted">Leave blank to inherit; enter <code>{}</code> for an explicit empty override.</p>{% endif %}
+    </div>
+  </details>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow"><svg class="icon sm"><use href="#i-sliders"/></svg> Experiment Setup</p>
+    <h1>Configure an audit</h1>
+  </div>
+</div>
+
+{% if errors %}
+  <div id="form-errors" class="alert error" tabindex="-1" data-autofocus-error>
+    <svg class="icon"><use href="#i-alert"/></svg>
+    <div>
+      <strong>Needs attention</strong>
+      {% for error in errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+  </div>
+{% endif %}
+{% if job_id %}
+  <div class="run-progress" data-job-id="{{ job_id }}">
+    <div class="progress-top"><strong>Audit running</strong><span data-progress-text>Preparing audit...</span></div>
+    <div class="progress-bar"><span data-progress-bar style="width: 4%"></span></div>
+  </div>
+{% endif %}
+
+<section class="start-bar">
+  <div class="start-bar-label">
+    <p class="eyebrow"><svg class="icon sm"><use href="#i-upload"/></svg> Start from a config</p>
+    <span class="start-bar-source" title="{{ current_source }}">{{ current_source }}</span>
+  </div>
+  <form method="post" action="/config/load" class="start-bar-form">
+    <label class="sr-only" for="config_path">Load a checked-in config</label>
+    <select id="config_path" name="config_path">
+      {% for item in config_files %}
+        <option value="{{ item.path }}">{{ item.label }}</option>
+      {% endfor %}
+    </select>
+    <button class="button" type="submit"><svg class="icon sm"><use href="#i-database"/></svg> Load</button>
+  </form>
+  <span class="start-bar-or">or</span>
+  <form method="post" action="/config/upload" enctype="multipart/form-data" class="start-bar-form">
+    <label class="button">
+      <svg class="icon sm"><use href="#i-upload"/></svg> Upload YAML
+      <input id="config_file" name="config_file" type="file" accept=".yaml,.yml" class="sr-only" data-submit-on-change>
+    </label>
+  </form>
+</section>
+
+<form id="config-form" method="post" action="/configure" class="config-layout">
+  <div class="config-main">
+      <article class="panel">
+        <div class="panel-head">
+          <p class="eyebrow"><span class="summary-icon num">1</span> Judge Setup</p>
+        </div>
+          <div class="form-section">
+            <div class="field-grid two">
+            <label>Judge provider
+              <input name="judge_provider" value="{{ judge.get('provider', 'openai') }}" placeholder="openai, fireworks, gemini, or a custom profile">
+            </label>
+            <label>Judge model
+              <input name="judge_model" value="{{ judge.get('model', '') }}" placeholder="e.g. gpt-4o-mini, or mock">
+            </label>
+            <label>Output type
+              <select name="output_type">
+                {% for option in output_options %}
+                  <option value="{{ option }}" {{ 'selected' if judge.get('output_type', 'binary') == option else '' }}>{{ option|title_label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="form-section">
+          <details class="disclosure embedded-disclosure" {{ 'open' if not judge.get('prompt_template') or not judge.get('rubric') else '' }}>
+            <summary>
+              <span class="summary-icon"><svg class="icon sm"><use href="#i-file"/></svg></span>
+              <span class="summary-text"><span class="eyebrow">Judge Prompt and Rubric</span></span>
+              <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+            </summary>
+            <div class="disclosure-body">
+              <label>Prompt template
+                <textarea name="prompt_template" rows="9">{{ judge.get('prompt_template', '') }}</textarea>
+              </label>
+              <label>Rubric
+                <textarea name="rubric" rows="9">{{ judge.get('rubric', '') }}</textarea>
+              </label>
+              <div class="field-grid two">
+                <label class="check-row">
+                  <input type="checkbox" name="threshold_enabled" {{ 'checked' if judge.get('threshold') is not none else '' }}>
+                  Use score threshold
+                </label>
+                <label>Threshold
+                  <input name="threshold" type="number" step="0.1" value="{{ judge.get('threshold', 3) if judge.get('threshold') is not none else 3 }}">
+                </label>
+                <label>Score direction
+                  <select name="score_direction">
+                    {% for option in score_direction_options %}
+                      <option value="{{ option }}" {{ 'selected' if judge.get('score_direction', 'higher_is_better') == option else '' }}>{{ option|title_label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>Invariant tolerance
+                  <input name="invariant_tolerance" type="number" min="0" step="any" value="{{ judge.get('invariant_tolerance', 0) }}">
+                </label>
+                <label>Score minimum
+                  <input name="score_min" type="number" step="any" value="{{ judge.get('score_min', '') if judge.get('score_min') is not none else '' }}">
+                </label>
+                <label>Score maximum
+                  <input name="score_max" type="number" step="any" value="{{ judge.get('score_max', '') if judge.get('score_max') is not none else '' }}">
+                </label>
+                <label>Scalar gold tolerance
+                  <input name="gold_tolerance" type="number" min="0" step="any" value="{{ judge.get('gold_tolerance', '') if judge.get('gold_tolerance') is not none else '' }}">
+                </label>
+              </div>
+              <label>Judge decoding parameters
+                <textarea class="mono" name="judge_decoding_params" rows="4">{{ judge_decoding_text }}</textarea>
+              </label>
+              <label>Output schema
+                <textarea class="mono" name="output_schema" rows="4">{{ output_schema_text }}</textarea>
+              </label>
+            </div>
+          </details>
+        </div>
+      </article>
+
+      <details class="disclosure primary" open>
+        <summary>
+          <span class="summary-icon num">2</span>
+          <span class="summary-text"><span class="eyebrow">Data Mapping</span></span>
+          <span class="summary-note">{{ item_count }} items · {{ labeled_count }} labeled</span>
+          <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+        </summary>
+        <div class="disclosure-body">
+          <label>Items path
+            <input name="items_path" value="{{ data.get('items_path', '') }}">
+          </label>
+          <label>Dataset context path <span class="muted">(optional; sent to the suggester)</span>
+            <input name="context_path" value="{{ data.get('context_path', '') if data.get('context_path') is not none else '' }}">
+          </label>
+          <div class="field-grid two">
+            <label>Input field
+              <input name="input_field" value="{{ data.get('input_field', 'input') }}">
+            </label>
+            <label>Output field
+              <input name="output_field" value="{{ data.get('output_field', 'output') }}">
+            </label>
+          </div>
+          <div class="field-grid two">
+            <label class="check-row">
+              <input type="checkbox" name="gold_enabled" {{ 'checked' if gold_enabled else '' }}>
+              Use gold labels
+            </label>
+            <label>Gold label field
+              <input name="gold_field" value="{{ gold_field_value }}">
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="disclosure primary">
+        <summary>
+          <span class="summary-icon num">3</span>
+          <span class="summary-text"><span class="eyebrow">Invariant Perturbations</span></span>
+          <span class="summary-note"><span data-invariant-count>{{ invariant_selected_count }}</span> selected</span>
+          <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+        </summary>
+        <div class="disclosure-body">
+          <p class="muted">An empty built-in invariant selection runs no built-in invariant probes. Suggested choices replace the built-in selection; review them before running. With no built-in or enabled custom probes, the audit is baseline-only.</p>
+          <div class="segmented">
+            <label><input type="radio" name="operator_mode" value="manual" {{ 'checked' if operator_mode == 'manual' else '' }}> Manual</label>
+            <label><input type="radio" name="operator_mode" value="suggest" {{ 'checked' if operator_mode == 'suggest' else '' }}> Suggested</label>
+          </div>
+          {% if last_planned %}
+            <div class="alert success compact">
+              <svg class="icon"><use href="#i-sparkle"/></svg>
+              <div>
+                <strong>Perturbation suggestions generated</strong>
+                <p>{{ last_planned.effective|length + last_planned.effective_directional|length }} operators in the reviewed allow-list.</p>
+                {% if last_planned.rationale %}<p>{{ last_planned.rationale }}</p>{% endif %}
+              </div>
+            </div>
+          {% endif %}
+          {% if not last_planned %}
+            <div class="alert error compact" data-suggested-empty hidden>
+              <svg class="icon"><use href="#i-alert"/></svg>
+              <div>
+                <strong>No suggestions yet</strong>
+                <p>Run Suggest Perturbations before using the Suggested list.</p>
+              </div>
+            </div>
+          {% endif %}
+          <div class="table-wrap" data-invariant-table>
+            <table>
+              <thead><tr><th>Run</th><th>Family</th><th>Dimension</th><th>Type</th><th>Target</th><th>Expected</th></tr></thead>
+              <tbody>
+                {% for spec in invariant_specs %}
+                  {% set spec_status = operator_status.get(spec.operator, 'Unavailable') %}
+                  <tr>
+                    <td><input type="checkbox" name="perturbation_operators" value="{{ spec.operator }}" {{ 'checked' if spec.operator in invariant_selected or invariant_selects_all else '' }}
+                      data-operator-row
+                      data-family-label="{{ spec.family.value|family_label }}"
+                      data-family-accent="{{ spec.family.value|family_accent }}"
+                      data-dimension="{{ spec.dimension }}"
+                      data-operator="{{ spec.operator }}"
+                      data-type="{{ 'Rule' if spec.kind == 'det' else 'LLM' }}"
+                      data-target="{{ spec.target }}"
+                      data-touches="{{ spec.touches|join(', ') }}"
+                      data-expected="{{ spec.expected_relation.value|title_label }} · {{ spec.default_effect.value|title_label }}"
+                      data-validation-kind="{{ spec.validation_kind|title_label if spec.validation_kind else '' }}"
+                      data-status="{{ spec_status }}"
+                      data-status-ok="{{ 'true' if spec_status == 'Runs in this environment' else 'false' }}"
+                      {% set spec_preview = preview_lookup.get(spec.operator) %}
+                      {% if spec_preview %}
+                        data-preview-summary="{{ spec_preview.summary }}"
+                        data-preview-before="{{ spec_preview.before }}"
+                        data-preview-after="{{ spec_preview.after if spec_preview.after is not none else 'Generated during the run.' }}"
+                      {% endif %}></td>
+                    <td><span class="pill t-{{ spec.family.value|family_accent }}">{{ spec.family.value|family_label }}</span></td>
+                    <td><strong>{{ spec.dimension }}</strong><br><code>{{ spec.operator }}</code></td>
+                    <td>{{ 'Rule' if spec.kind == 'det' else 'LLM' }}</td>
+                    <td><code>{{ spec.target }}</code></td>
+                    <td>{{ spec.expected_relation.value|title_label }}<br><span class="muted">{{ spec.default_effect.value|title_label }}</span></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="form-section">
+            <p class="eyebrow">Perturbation generator</p>
+            <p class="muted">Generates LLM-backed edits. Planner, validator, and summary settings inherit these defaults unless overridden below.</p>
+            {{ role_fields('Perturbation agent', 'perturbation_agent_provider', perturbation_agent.get('provider', 'openai'), 'perturbation_agent_model', perturbation_agent.get('model', ''), 'perturbation_decoding_params', perturbation_decoding_text) }}
+          </div>
+        </div>
+      </details>
+
+      {% if directional_allowed %}
+      <details class="disclosure primary">
+        <summary>
+          <span class="summary-icon num">4</span>
+          <span class="summary-text"><span class="eyebrow">Directional Perturbations</span></span>
+          <span class="summary-note"><span data-directional-count>{{ directional_selected|length }}</span> selected</span>
+          <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+        </summary>
+        <div class="disclosure-body">
+          <p class="muted">Directional operators intentionally make the item worse. Empty means none run.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Run</th><th>Family</th><th>Dimension</th><th>Type</th><th>Target</th><th>Validation</th></tr></thead>
+              <tbody>
+                {% for spec in directional_specs %}
+                  {% set spec_status = operator_status.get(spec.operator, 'Unavailable') %}
+                  <tr>
+                    <td><input type="checkbox" name="directional_operators" value="{{ spec.operator }}" {{ 'checked' if spec.operator in directional_selected else '' }}
+                      data-operator-row
+                      data-family-label="{{ spec.family.value|family_label }}"
+                      data-family-accent="{{ spec.family.value|family_accent }}"
+                      data-dimension="{{ spec.dimension }}"
+                      data-operator="{{ spec.operator }}"
+                      data-type="{{ 'Rule' if spec.kind == 'det' else 'LLM' }}"
+                      data-target="{{ spec.target }}"
+                      data-touches="{{ spec.touches|join(', ') }}"
+                      data-expected="{{ spec.default_effect.value|title_label }}"
+                      data-validation-kind="{{ spec.validation_kind|title_label if spec.validation_kind else '' }}"
+                      data-status="{{ spec_status }}"
+                      data-status-ok="{{ 'true' if spec_status == 'Runs in this environment' else 'false' }}"
+                      {% set spec_preview = preview_lookup.get(spec.operator) %}
+                      {% if spec_preview %}
+                        data-preview-summary="{{ spec_preview.summary }}"
+                        data-preview-before="{{ spec_preview.before }}"
+                        data-preview-after="{{ spec_preview.after if spec_preview.after is not none else 'Generated during the run.' }}"
+                      {% endif %}></td>
+                    <td><span class="pill t-{{ spec.family.value|family_accent }}">{{ spec.family.value|family_label }}</span></td>
+                    <td><strong>{{ spec.dimension }}</strong><br><code>{{ spec.operator }}</code></td>
+                    <td>{{ 'Rule' if spec.kind == 'det' else 'LLM' }}</td>
+                    <td><code>{{ spec.target }}</code></td>
+                    <td>{{ spec.validation_kind or 'Structural guard' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+      {% else %}
+        <p class="muted">Pairwise audits use invariants only. Position swaps preserve candidate identity; directional probes, including custom ones, are not supported.</p>
+      {% endif %}
+
+      <details class="disclosure primary">
+        <summary>
+          <span class="summary-icon num">5</span>
+          <span class="summary-text"><span class="eyebrow">Custom Perturbations</span></span>
+          <span class="summary-note"><span data-custom-count>{{ custom_selected_count }}</span> selected</span>
+          <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+        </summary>
+        <div class="disclosure-body">
+          <input type="hidden" name="custom_count" value="{{ custom_rows|length }}">
+          <div class="custom-grid">
+            {% for row in custom_rows %}
+              {% set index = loop.index0 %}
+              <div class="custom-card" data-custom-row>
+                <div class="field-grid three">
+                  <label>Name
+                    <input name="custom_{{ index }}_name" value="{{ row.name }}" data-custom-name>
+                  </label>
+                  <label>Target
+                    <select name="custom_{{ index }}_target">
+                      {% for target in ['judge.prompt_template', 'judge.rubric', 'item.input', 'item.output'] %}
+                        <option value="{{ target }}" {{ 'selected' if row.target == target else '' }}>{{ target }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label>Relationship
+                    <select name="custom_{{ index }}_expected_effect">
+                      <option value="same_verdict" {{ 'selected' if row.expected_effect == 'same_verdict' else '' }}>Invariant</option>
+                      {% if directional_allowed %}
+                      <option value="worse_verdict" {{ 'selected' if row.expected_effect == 'worse_verdict' else '' }}>Directional</option>
+                      {% endif %}
+                    </select>
+                  </label>
+                </div>
+                <label>Instruction
+                  <textarea name="custom_{{ index }}_instruction" rows="3" data-custom-instruction>{{ row.instruction }}</textarea>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="custom_{{ index }}_enabled" {{ 'checked' if row.enabled else '' }} data-custom-enabled>
+                  Enabled
+                </label>
+                <div class="custom-card-actions">
+                  <button class="button sm" type="submit" name="custom_suggest_index" value="{{ index }}" formaction="/custom-perturbations/suggest" formmethod="post">
+                    <svg class="icon sm"><use href="#i-sparkle"/></svg> Suggest custom perturbation
+                  </button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+
+      <div class="form-section">
+        <p class="eyebrow">Run Settings</p>
+        <div class="field-grid two">
+          <label>Repeats
+            <input name="repeats" type="number" min="1" value="{{ audit.get('repeats', 10) }}">
+          </label>
+          <label>Runs directory
+            <input name="runs_dir" value="{{ output.get('runs_dir', 'runs') }}">
+          </label>
+        </div>
+      </div>
+
+      <p class="section-divider">Advanced configuration</p>
+
+      <details class="disclosure quiet">
+        <summary>
+          <span class="summary-text"><span class="eyebrow">Audit Engine Run Settings</span></span>
+          <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+        </summary>
+        <div class="disclosure-body">
+          <div class="field-grid two">
+            <label>Parallel generation/judge workers
+              <input name="num_workers" type="number" min="1" value="{{ audit.get('num_workers', 1) }}">
+            </label>
+            <label>Boundary width (threshold proximity)
+              <input name="scalar_delta" type="number" min="0.01" step="any" value="{{ audit.get('scalar_delta', 1.0) }}">
+            </label>
+            <label>Review list size
+              <input name="top_k_routes" type="number" min="1" value="{{ audit.get('top_k_routes', 10) }}">
+            </label>
+          </div>
+          <p class="muted">Boundary width describes proximity to a configured decision threshold. It does not set the invariant tolerance or directional detection threshold. Call estimates are upper bounds before eligibility, applicability, and validation.</p>
+          {% if estimate %}
+            <div class="metric-strip">
+              <div><b>{{ estimate.llm_generation_units }}</b><span>Upper-bound agent generations</span></div>
+              <div><b>{{ estimate.deterministic_perturbations }}</b><span>Rule variants</span></div>
+            </div>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="disclosure quiet">
+        <summary>
+          <span class="summary-text"><span class="eyebrow">Optional Agent Overrides</span></span>
+          <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+        </summary>
+        <div class="disclosure-body">
+          <div class="form-section">
+            {{ role_fields('Validator', 'validator_provider', validator_provider_value, 'validator_model', validator_model_value, 'validator_decoding_params', validator_decoding_text, 'Structural edits need explicit guards. Every semantic change, including deterministic ones, is validated before it contributes. The validator must differ from the judge; use a fixed validator when comparing generators.', true) }}
+          </div>
+          <div class="form-section">
+            {{ role_fields('Perturbation suggester', 'planner_provider', planner_provider_value, 'planner_model', planner_model_value, 'planner_decoding_params', planner_decoding_text, '', true) }}
+            <label>Perturbation suggester dataset context limit
+              <input name="planner_dataset_context_max_chars" type="number" min="1000" value="{{ planner_agent.get('dataset_context_max_chars', 40000) }}">
+            </label>
+          </div>
+          <div class="form-section">
+            {{ role_fields('Summary', 'summary_provider', summary_provider_value, 'summary_model', summary_model_value, 'summary_decoding_params', summary_decoding_text, '', true) }}
+          </div>
+        </div>
+      </details>
+
+  </div>
+
+  <aside class="run-summary">
+    <div class="run-summary-head">
+      <p class="eyebrow"><svg class="icon sm"><use href="#i-play"/></svg> Summary</p>
+    </div>
+    <div class="run-summary-body">
+      {% if validation_error %}
+        <div class="status-line bad"><svg class="icon sm"><use href="#i-alert"/></svg> Config is not valid</div>
+      {% elif item_error %}
+        <div class="status-line warn"><svg class="icon sm"><use href="#i-alert"/></svg> Items could not be loaded</div>
+      {% elif config_valid %}
+        <div class="status-line ok"><svg class="icon sm"><use href="#i-check"/></svg> Config is valid</div>
+      {% else %}
+        <div class="status-line warn"><svg class="icon sm"><use href="#i-info"/></svg> Awaiting a runnable config</div>
+      {% endif %}
+      <div class="summary-stats">
+        <div class="summary-stat"><span>Items</span><b>{{ item_count }}</b></div>
+        <div class="summary-stat"><span>Gold-labeled</span><b>{{ labeled_count }}</b></div>
+        <div class="summary-stat"><span>Perturbations</span><b data-summary-checks>{{ rows|length }}</b></div>
+        {% if estimate %}
+          <div class="summary-stat"><span>Max judge calls</span><b>{{ estimate.max_judge_calls }}</b></div>
+          <div class="summary-stat"><span>Upper-bound agent generations</span><b>{{ estimate.llm_generation_units }}</b></div>
+        {% endif %}
+      </div>
+      <div class="summary-actions">
+        <button class="button primary" type="submit" formaction="/runs/start" formmethod="post"><svg class="icon sm"><use href="#i-play"/></svg> Run Audit</button>
+        <button class="button" type="submit" formaction="/planner/suggest" formmethod="post"><svg class="icon sm"><use href="#i-sparkle"/></svg> Suggest Perturbations</button>
+      </div>
+      <div class="autosave-note" data-autosave-status>Changes save automatically in this session.</div>
+    </div>
+  </aside>
+</form>
+
+<p class="section-divider">Review</p>
+
+<details class="disclosure quiet">
+  <summary>
+    <span class="summary-text"><span class="eyebrow">Run Preview</span></span>
+    <span class="summary-note"><span data-runnable-count>{{ rows|length }}</span> selected</span>
+    <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+  </summary>
+  <div class="disclosure-body">
+    <section class="dash-grid">
+      <div class="span-12">
+        <p class="eyebrow">Chosen perturbations</p>
+        {% if rows %}
+          <div class="table-wrap compact-table">
+            <table>
+              <thead><tr><th>Family</th><th>Dimension</th><th>Type</th><th>Changes</th><th>Expected response</th><th>Validation</th><th>Status</th></tr></thead>
+              <tbody data-operator-body>
+                {% for row in rows %}
+                  <tr>
+                    <td><span class="pill t-{{ row.family|family_accent }}">{{ row.family|family_label }}</span></td>
+                    <td><strong>{{ row.dimension }}</strong><br><code>{{ row.operator }}</code></td>
+                    <td>{{ 'Rule' if row.kind == 'det' else 'LLM' }}</td>
+                    <td><code>{{ row.target }}</code>{% if row.touches %}<br><span class="muted">{{ row.touches|join(', ') }}</span>{% endif %}</td>
+                    <td>{{ row.expected_relation|title_label }}<br><span class="muted">{{ row.expected_effect|title_label }}</span></td>
+                    <td>
+                      {% if row.operator == 'judge_rubric_criterion_reorder' %}
+                        Structural guard or LLM validation
+                      {% elif row.validation_kind %}
+                        LLM validator: {{ row.validation_kind|title_label }}
+                      {% else %}
+                        <span class="muted">Structural guard</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if row.status == 'Runs in this environment' %}
+                        <span class="status-glyph ok" title="{{ row.status }}" aria-label="{{ row.status }}">&#10003;</span>
+                      {% else %}
+                        <span class="status-glyph bad" title="{{ row.status }}" aria-label="{{ row.status }}">&times;</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted">No perturbations selected. A valid judge and dataset can still run a baseline-only audit.</p>
+        {% endif %}
+      </div>
+      <div class="span-12">
+        <details class="disclosure embedded-disclosure preview-disclosure">
+          <summary>
+            <span class="summary-icon"><svg class="icon sm"><use href="#i-file"/></svg></span>
+            <span class="summary-text"><span class="eyebrow">Perturbation Examples</span></span>
+            <span class="summary-note"><span data-preview-count>{{ previews|length }}</span> examples</span>
+            <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+          </summary>
+          <div class="disclosure-body">
+            <div data-preview-body>
+              {% for preview in previews %}
+                <div class="preview-card" data-preview-card data-preview-operator="{{ preview.operator }}">
+                  <div class="preview-top"><span class="pill t-{{ preview.family|family_accent }}">{{ preview.family|family_label }}</span><strong>{{ preview.dimension }}</strong></div>
+                  <p>{{ preview.summary }}</p>
+                  <div class="diff-mini">
+                    <div><span>Before</span><pre>{{ preview.before }}</pre></div>
+                    <div><span>After</span><pre>{{ preview.after if preview.after is not none else 'Generated during the run.' }}</pre></div>
+                  </div>
+                </div>
+              {% else %}
+                <p class="muted">No preview examples are available yet.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+  </div>
+</details>
+
+<details class="disclosure quiet">
+  <summary>
+    <span class="summary-text"><span class="eyebrow">Resolved YAML</span></span>
+    <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+  </summary>
+  <div class="disclosure-body">
+    <pre class="yaml-block" data-config-yaml>{{ raw_yaml }}</pre>
+  </div>
+</details>
+{% endblock %}

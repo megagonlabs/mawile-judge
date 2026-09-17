@@ -1,0 +1,40 @@
+judge:
+  model: mock
+  output_type: binary
+  threshold: 3
+  decoding_params:
+    temperature: 0
+  output_schema:
+    format: json
+    fields:
+      - score
+      - label
+      - reason
+  prompt_template: |
+    You are a careful evaluator. Score the agent output against the complete
+    agent input using the rubric. Return JSON with a numeric score, a
+    pass/fail label, and a short reason.
+  rubric: |
+    5: Fully satisfies the task with no unsupported claims.
+    4: Mostly satisfies the task with minor omissions.
+    3: Borderline acceptable; some useful content but notable gaps.
+    2: Fails an important requirement or includes unsupported content.
+    1: Does not meaningfully satisfy the task.
+
+data:
+  items_path: ../items.jsonl
+
+audit:
+  repeats: 10
+  # Empty means baseline-only. Keep the local demo entirely offline.
+  perturbation_operators:
+    - judge_prompt_instruction_order
+  top_k_routes: 10
+
+# Point this at a model distinct from the judge and select LLM-backed operators
+# explicitly to enable generated probes.
+perturbation_agent:
+  model: mock
+
+output:
+  runs_dir: runs

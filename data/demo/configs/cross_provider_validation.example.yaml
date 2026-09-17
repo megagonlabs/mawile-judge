@@ -1,0 +1,47 @@
+# OpenAI-compatible providers all use Chat Completions. Provider names select
+# credentials and endpoints independently from model identifiers.
+judge:
+  provider: openai
+  model: gpt-5.4-nano-2026-03-17
+  output_type: binary
+  threshold: 3
+  decoding_params:
+    temperature: 0
+    max_completion_tokens: 400
+  output_schema:
+    format: json
+    fields: [score, label, reason]
+  prompt_template: |
+    You are a careful evaluator. Score the agent output against the complete
+    agent input using the rubric.
+  rubric: |
+    5: Fully satisfies the task with no unsupported claims.
+    4: Mostly satisfies the task with minor omissions.
+    3: Borderline acceptable; some useful content but notable gaps.
+    2: Fails an important requirement or includes unsupported content.
+    1: Does not meaningfully satisfy the task.
+
+data:
+  items_path: ../items.jsonl
+
+audit:
+  perturbation_operators:
+    - agent_input_paraphrase
+  repeats: 2
+
+perturbation_agent:
+  provider: fireworks
+  model: accounts/fireworks/models/qwen3-235b-a22b
+  decoding_params:
+    temperature: 0.7
+
+# An explicit override is never silently replaced by rule validation if its
+# provider key is missing.
+validator_agent:
+  provider: gemini
+  model: gemini-2.5-flash
+  decoding_params:
+    temperature: 0
+
+output:
+  runs_dir: runs

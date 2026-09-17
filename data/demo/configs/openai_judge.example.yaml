@@ -1,0 +1,48 @@
+judge:
+  provider: openai
+  model: gpt-5.4-nano-2026-03-17
+  output_type: binary
+  threshold: 3
+  decoding_params:
+    temperature: 0
+    max_completion_tokens: 400
+  output_schema:
+    format: json
+    fields:
+      - score
+      - label
+      - reason
+  prompt_template: |
+    You are a careful evaluator. Score the agent output against the complete
+    agent input using the rubric.
+  rubric: |
+    5: Fully satisfies the task with no unsupported claims.
+    4: Mostly satisfies the task with minor omissions.
+    3: Borderline acceptable; some useful content but notable gaps.
+    2: Fails an important requirement or includes unsupported content.
+    1: Does not meaningfully satisfy the task.
+
+data:
+  items_path: ../items.jsonl
+
+audit:
+  repeats: 10
+  # Empty means baseline-only; name the probes you want to run.
+  perturbation_operators:
+    - judge_prompt_instruction_order
+    - judge_prompt_reasoning_style
+    - judge_rubric_criterion_reorder
+    - agent_input_paraphrase
+  top_k_routes: 10
+
+# Generates explicitly selected LLM-backed operators and runs independent
+# equivalence checks. Use a model distinct from the judge above so the audit
+# does not vet its own probes.
+perturbation_agent:
+  provider: openai
+  model: gpt-5.4-mini-2026-03-17
+  decoding_params:
+    temperature: 0.7
+
+output:
+  runs_dir: runs

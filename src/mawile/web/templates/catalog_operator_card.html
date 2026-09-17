@@ -1,0 +1,72 @@
+<article class="catalog-card">
+  <div class="catalog-card-top">
+    <span class="pill t-{{ row.family|family_accent }}">{{ row.family|family_label }}</span>
+    <span class="chip">{{ 'Rule' if row.kind == 'det' else 'LLM' }}</span>
+    <span class="chip">{{ row.expected_relation|title_label }}</span>
+    <span class="chip">{{ row.expected_effect|title_label }}</span>
+  </div>
+  <h3>{{ row.dimension }}</h3>
+  {% if row.description %}
+    <p class="catalog-description">{{ row.description }}</p>
+  {% endif %}
+  <dl class="catalog-meta">
+    <div>
+      <dt>Operator</dt>
+      <dd><code>{{ row.operator }}</code></dd>
+    </div>
+    <div>
+      <dt>Target</dt>
+      <dd><code>{{ row.target }}</code></dd>
+    </div>
+    <div>
+      <dt>Applies to</dt>
+      <dd>{{ row.applies_to|title_label }}</dd>
+    </div>
+    <div>
+      <dt>Touches</dt>
+      <dd>{{ row.touches|join(', ') if row.touches else 'n/a' }}</dd>
+    </div>
+    <div>
+      <dt>Validation</dt>
+      <dd>
+        {% if row.operator == 'judge_rubric_criterion_reorder' %}
+          Structural guard or LLM validation
+        {% elif row.validation_kind %}
+          LLM: <code>{{ row.validation_kind }}</code>
+        {% else %}
+          Structural guard
+        {% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Limitations</dt>
+      <dd>{{ row.limitations|join(' ') if row.limitations else 'None' }}</dd>
+    </div>
+  </dl>
+
+  {% if row.instruction %}
+    <details class="catalog-prompt">
+      <summary>Generation prompt</summary>
+      <pre>{{ row.instruction }}</pre>
+    </details>
+  {% elif row.operator == 'judge_rubric_criterion_reorder' %}
+    <p class="catalog-note">Built offline by a rule. The rubric structure determines whether a structural guard suffices or LLM validation is required.</p>
+  {% elif row.validation_kind %}
+    <p class="catalog-note">Built offline by a rule. This semantic claim still requires LLM validation; deterministic construction does not establish admissibility.</p>
+  {% else %}
+    <p class="catalog-note">Built offline by a rule, with no generation-model call. Accepted only when the explicit structural guards pass; unsupported inputs are skipped.</p>
+  {% endif %}
+
+  {% if row.operator == 'agent_paired_position_swap' %}
+    <p class="catalog-note">Position swaps are one pairwise invariant; applicable judge/input invariants remain available too. Verdicts compare stable candidate IDs, not display positions. Pairwise directional probes are unavailable, including custom ones.</p>
+  {% elif row.operator == 'judge_rubric_criterion_reorder' %}
+    <p class="catalog-note">Only an unambiguous flat numeric-row rubric is structurally guarded. Delimited nonnumeric blocks require semantic validation; ambiguous or free-form rubrics are skipped.</p>
+  {% endif %}
+
+  {% if row.validation_prompt %}
+    <details class="catalog-prompt">
+      <summary>{{ 'Semantic validation prompt (when required)' if row.operator == 'judge_rubric_criterion_reorder' else 'Validation prompt' }}</summary>
+      <pre>{{ row.validation_prompt }}</pre>
+    </details>
+  {% endif %}
+</article>

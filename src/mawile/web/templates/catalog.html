@@ -1,0 +1,214 @@
+{% extends "layout.html" %}
+{% block title %}Docs · MAWILE{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow"><svg class="icon sm"><use href="#i-file"/></svg> Docs</p>
+    <h1>System reference docs</h1>
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Docs sections">
+  <a href="#tab-overview" data-tab="tab-overview" class="active">Overview</a>
+  <a href="#tab-operators" data-tab="tab-operators">Operators</a>
+  <a href="#tab-validation" data-tab="tab-validation">Validation</a>
+</nav>
+
+<section id="tab-overview" class="tab-panel">
+
+  <article class="panel catalog-diagram-panel">
+    <div class="panel-head">
+      <p class="eyebrow"><svg class="icon sm"><use href="#i-activity"/></svg> Audit Flow</p>
+    </div>
+    <img class="catalog-diagram" src="{{ url_for('static', path='/catalog-audit-flow.svg') }}" alt="MAWILE flow from inputs through perturbations, validation, judge calls, and results">
+  </article>
+
+  <div class="catalog-section">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-activity"/></svg> Evidence Lanes</p>
+        <h2>What the report is designed to separate</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid three">
+      <article class="catalog-info-card"><b>Invariant stability</b><p>Meaning-preserving perturbations should keep the verdict stable. These perturbations drive flip risk, signed score shifts, and invariant risk themes.</p></article>
+      <article class="catalog-info-card"><b>Directional degradation</b><p>For pointwise judges, edits that make a response worse relative to its task should receive worse scores or labels. These probes measure degradation detection, missed degradations, and contradictions.</p></article>
+      <article class="catalog-info-card"><b>Gold standard correctness</b><p>Trusted labels are not perturbations. They measure baseline judge accuracy, confusion patterns, and how useful the review queue is for finding true errors.</p></article>
+    </div>
+  </div>
+
+  <div class="catalog-section" id="invariant-metrics-docs">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-bar"/></svg> Invariant Metrics</p>
+        <h2>How to read stability results</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid three">
+      <article class="catalog-info-card"><b>Flip rate</b><p>Each perturbed verdict is compared with its repeated-original baseline: a majority label or stable candidate ID, or a mean numeric score. Numeric disagreements require <code>|perturbed&nbsp;&minus;&nbsp;baseline| &gt; saved tolerance</code>, even if a threshold-derived label stays the same.</p></article>
+      <article class="catalog-info-card"><b>Noise floor</b><p>The repeated-original flip rate is reported as separate context. It is not subtracted from invariant flip risk.</p></article>
+      <article class="catalog-info-card"><b>Signed score shift</b><p>The average perturbed score minus the original baseline score. A positive shift is more lenient for a higher-is-better judge, and stricter for a lower-is-better judge. Stability alone is not an accuracy guarantee.</p></article>
+    </div>
+    <p class="catalog-note">The headline invariant risk averages item-level risks; operator attribution pools individual comparisons. Missing or failed verdicts are excluded, not counted as agreement or zero risk. Check coverage and parse/transport failures alongside the rates.</p>
+  </div>
+
+  <div class="catalog-section" id="directional-detection-docs">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-trend-down"/></svg> Directional Metrics</p>
+        <h2>How to read degradation detection</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid three">
+      <article class="catalog-info-card"><b>Directional detection</b><p>Each eligible item/variant case compares repeated verdicts: mean scores or majority labels. Any decrease in judged quality counts as detection, respecting the configured score direction; for binary judges, pass&nbsp;&rarr;&nbsp;fail counts. A rate of <code>0.705</code> means 70.5% of analyzable eligible cases were detected.</p></article>
+      <article class="catalog-info-card"><b>Noise-adjusted detection</b><p>For numeric judges, the quality drop must exceed the item's repeated-baseline score standard deviation. For binary judges, subtract the item's baseline flip rate from each detection credit, average, then floor the result at zero. This is descriptive, not a significance test.</p></article>
+      <article class="catalog-info-card"><b>Contradiction</b><p>An eligible degradation receives a better quality score or label instead of a worse one. Unchanged verdicts are misses, not contradictions. Cases without usable comparisons remain unavailable rather than becoming zero-rate evidence.</p></article>
+    </div>
+    <p class="catalog-note">Eligibility is decided from repeated judge baselines, not gold labels. Binary baselines must pass; ordinal baselines must be outside the worst-score margin defined by <code>invariant_tolerance</code>. For example, a 1&ndash;10 higher-is-better scale with tolerance 1 requires a baseline mean above 2. This margin controls eligibility, not the detection threshold. Pairwise audits have no directional probes.</p>
+  </div>
+
+  <div class="catalog-section">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-play"/></svg> Walkthrough</p>
+        <h2>How an audit works</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid">
+      <article class="catalog-info-card"><b>1. Configure and select</b><p>Load the judge definition and evaluation items, then review the operator selection. Suggestions replace the built-in selection; they are not automatically added to manual choices. An empty selection can run baselines alone.</p></article>
+      <article class="catalog-info-card"><b>2. Judge the originals</b><p>Repeat the original cases to measure baseline noise and resolve directional eligibility before generation. Eligibility is separate from operator applicability and later validation.</p></article>
+      <article class="catalog-info-card"><b>3. Build candidate edits</b><p>Generate judge-wide variants once, and item-scoped variants for individual eligible items, using rules or an LLM. Selection is not a promise that every operator can run on every item; unsupported constructions are skipped.</p></article>
+      <article class="catalog-info-card"><b>4. Validate and save the suite</b><p>Structural edits need explicit guards. Semantic changes, including rule-built reasoning style and partial completion, need LLM validation in grading context. Save candidates, validation decisions, and accepted item/variant applications in <code>suite.json</code> before perturbed judging.</p></article>
+      <article class="catalog-info-card"><b>5. Judge accepted pairs</b><p>After the generation/validation checkpoint, judge only accepted item/variant pairs with the configured repeat count, then report accepted, rejected, skipped, and failed work separately.</p></article>
+      <article class="catalog-info-card"><b>6. Read the evidence</b><p>Reports keep invariant stability, directional degradation detection, gold-label correctness, and call-level examples in separate views.</p></article>
+    </div>
+  </div>
+
+  <div class="catalog-section">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-cpu"/></svg> Model Roles</p>
+        <h2>Which model is doing what</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid four">
+      <article class="catalog-info-card"><b>Judge under test</b><p>The model being audited. The audit treats it as a black box and measures how its verdicts move.</p></article>
+      <article class="catalog-info-card"><b>Perturbation generator</b><p>Builds LLM-backed prompt, rubric, input, output, or paired rewrites from catalog instructions. Optional role overrides inherit the generator settings unless explicitly pinned.</p></article>
+      <article class="catalog-info-card"><b>Validator agent</b><p>Checks applicability and semantic admissibility using the full grading context. It must differ from the judge under test. It inherits the generator by default; hold it fixed across conditions when comparing generators.</p></article>
+      <article class="catalog-info-card"><b>Planner and summary agents</b><p>The planner proposes operator choices for review; the summary role explains report evidence. Both inherit generator settings unless overridden. Neither changes the judge verdicts or computed metrics.</p></article>
+    </div>
+  </div>
+
+  <div class="catalog-section">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-file"/></svg> Saved Workflows</p>
+        <h2>Replay, regenerate, and reanalyse</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid three">
+      <article class="catalog-info-card"><b><code>mawile replay</code></b><p>Requires <code>suite.json</code>. Reuses saved items, variants, validation decisions, and application scope, then makes fresh baseline and perturbed judge calls. It does not plan, generate, or validate again. Judge calls can incur costs.</p></article>
+      <article class="catalog-info-card"><b><code>mawile report --regenerate</code></b><p>Renders saved metrics, interpretation, and traces offline. It makes no model calls and does not recompute metrics. Use it to refresh report presentation, not to update an analysis policy.</p></article>
+      <article class="catalog-info-card"><b>Paper offline reanalysis</b><p><code>scripts/paper_scripts/reanalyze_experiments.py</code> reparses saved responses and recomputes metrics under an explicit recorded policy, without model calls. It reuses semantic validation decisions; it does not run a new semantic validation pass.</p></article>
+    </div>
+  </div>
+
+  <div class="catalog-section">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-sliders"/></svg> Config Semantics</p>
+        <h2>Defaults that matter</h2>
+      </div>
+    </div>
+    <div class="catalog-info-grid four">
+      <article class="catalog-info-card"><b>Empty invariant list</b><p><code>perturbation_operators: []</code> selects no built-in invariants. Enabled custom operators are selected separately; an empty built-in list does not disable them.</p></article>
+      <article class="catalog-info-card"><b>Empty directional list</b><p><code>directional_perturbation_operators: []</code> selects no built-in directionals. With both lists empty and no enabled custom operators, the run is baseline-only.</p></article>
+      <article class="catalog-info-card"><b>Gold label field</b><p><code>data.gold_field</code> points to trusted labels. Set it to <code>null</code> only when correctness should not be evaluated.</p></article>
+      <article class="catalog-info-card"><b>Custom and suggested choices</b><p>Suggestions replace the built-in choices for review. Enabled custom operators are additional explicit choices, still subject to applicability and validation. Pairwise custom operators must be invariant and target the judge prompt, rubric, or task input.</p></article>
+    </div>
+    <p class="catalog-note">Pairwise audits support applicable judge/input invariants plus candidate-position swaps, not arbitrary candidate-output rewrites. Swaps preserve stable candidate identity and belong to the invariant category. No pairwise directional probes are supported, including custom ones.</p>
+  </div>
+</section>
+
+<section id="tab-operators" class="tab-panel" hidden>
+  <details class="disclosure catalog-section catalog-operator-group" open>
+    <summary>
+      <span class="summary-icon"><svg class="icon sm"><use href="#i-zap"/></svg></span>
+      <span class="summary-text"><span class="eyebrow">Invariant Stability Operators</span><h2>Expected to preserve the judge verdict</h2></span>
+      <span class="summary-note">{{ invariant_catalog|length }} operators</span>
+      <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+    </summary>
+    <div class="disclosure-body">
+    <div class="catalog-grid">
+      {% for row in invariant_catalog %}
+        {% include "catalog_operator_card.html" %}
+      {% endfor %}
+    </div>
+    </div>
+  </details>
+
+  <details class="disclosure catalog-section catalog-operator-group">
+    <summary>
+      <span class="summary-icon"><svg class="icon sm"><use href="#i-trend-down"/></svg></span>
+      <span class="summary-text"><span class="eyebrow">Directional Degradation Operators</span><h2>Expected to lower judged quality (pointwise only)</h2></span>
+      <span class="summary-note">{{ directional_catalog|length }} operators</span>
+      <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+    </summary>
+    <div class="disclosure-body">
+    <div class="catalog-grid">
+      {% for row in directional_catalog %}
+        {% include "catalog_operator_card.html" %}
+      {% endfor %}
+    </div>
+    </div>
+  </details>
+</section>
+
+<section id="tab-validation" class="tab-panel" hidden>
+  <div class="catalog-section">
+    <div class="catalog-section-head">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-shield"/></svg> Validation Types</p>
+        <h2>Independent admissibility prompts</h2>
+      </div>
+      <span class="summary-note">{{ validation_catalog|length }} prompts</span>
+    </div>
+    <div class="catalog-info-grid four">
+      <article class="catalog-info-card"><b>Item edits</b><p>Validators receive original and edited transcripts plus the judge's instructions, rubric, and output semantics. A changed field is checked in its full grading context, not just for surface similarity.</p></article>
+      <article class="catalog-info-card"><b>Preserve existing errors</b><p>Invariant edits must preserve the response's existing correctness, mistakes, omissions, and task requirements. Repairing an incorrect original answer is not a meaning-preserving change.</p></article>
+      <article class="catalog-info-card"><b>Judge config</b><p>Prompt and rubric validators compare the original and edited judge instruments with dataset context. They check that grading criteria, requirements, and output semantics are preserved.</p></article>
+      <article class="catalog-info-card"><b>Gold labels</b><p>Gold standard labels are trusted inputs, not generated variants, so they feed correctness metrics rather than admissibility validation.</p></article>
+    </div>
+    <p class="catalog-note">Rubric criterion reorder is structural only for an unambiguous flat set of independently labelled numeric rows such as <code>1: ...</code>. Explicitly delimited nonnumeric blocks need semantic validation; ambiguous or free-form rubrics are skipped.</p>
+    <div class="catalog-grid validation-grid">
+      {% for row in validation_catalog %}
+        <article class="catalog-card validation-card">
+          <div class="catalog-card-top">
+            <span class="pill t-default">{{ row.kind|title_label }}</span>
+            <code>{{ row.kind }}</code>
+          </div>
+          <div class="catalog-prompt">
+            <span>Validator prompt</span>
+            <pre>{{ row.prompt }}</pre>
+          </div>
+          <div class="catalog-usage">
+            <span>Used by</span>
+            {% if row.operators %}
+              <div class="catalog-code-list">
+                {% for operator in row.operators %}
+                  <code>{{ operator }}</code>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No built-in operators currently use this validation type.</p>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+
+{% endblock %}

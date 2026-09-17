@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 716" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" role="img" aria-labelledby="title desc">
+  <title id="title">How the sensitivity audit tests a judge</title>
+  <desc id="desc">Repeated originals establish noise and directional eligibility. Selected probes build judge-wide or item-scoped candidates, apply structural guards or semantic validation, and judge accepted item/variant pairs. Pairwise audits use invariants only. Reports separate stability, degradation detection, and gold-label correctness.</desc>
+  <defs>
+    <style>
+      .h1 { font-size: 44px; font-weight: 800; fill: #10233f; }
+      .eyebrow { font-size: 13px; font-weight: 800; fill: #6b7788; letter-spacing: .06em; }
+      .section { font-size: 23px; font-weight: 800; fill: #10233f; }
+      .card-title { font-size: 17px; font-weight: 800; fill: #10233f; }
+      .lane-title { font-size: 16px; font-weight: 800; fill: #10233f; }
+      .title-green { fill: #187246; }
+      .title-orange { fill: #9a531f; }
+      .title-navy { fill: #10233f; }
+      .body { font-size: 14.5px; fill: #31445a; }
+      .small { font-size: 13px; fill: #526478; }
+      .tiny { font-size: 11.5px; font-weight: 700; fill: #607086; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; fill: #405064; }
+      .badge { font-size: 14px; font-weight: 800; fill: #ffffff; }
+      .pill { font-size: 12px; font-weight: 800; fill: #ffffff; }
+      .chip-label { font-size: 11.5px; font-weight: 800; fill: #ffffff; letter-spacing: .06em; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8493a5"/>
+    </marker>
+    <marker id="arrowsm" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="11" flood-color="#10233f" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="716" fill="#f7f8fa"/>
+
+  <text x="74" y="76" class="eyebrow">MAWILE</text>
+  <text x="74" y="125" class="h1">How the sensitivity audit tests a judge</text>
+
+  <!-- big flow arrows -->
+  <g stroke="#8493a5" stroke-width="3" marker-end="url(#arrow)" fill="none">
+    <line x1="378" y1="414" x2="424" y2="414"/>
+    <line x1="1178" y1="414" x2="1226" y2="414"/>
+  </g>
+
+  <!-- LEFT: inputs -->
+  <rect x="72" y="214" width="300" height="420" rx="12" fill="#ffffff" stroke="#c5d0dc" stroke-width="1.6" filter="url(#shadow)"/>
+  <text x="98" y="253" class="eyebrow">INPUTS</text>
+  <text x="98" y="288" class="section">What gets audited</text>
+
+  <rect x="98" y="320" width="244" height="126" rx="8" fill="#ffffff" stroke="#91a1b5" stroke-width="1.6"/>
+  <path d="M106 320 H334 Q342 320 342 328 V360 H98 V328 Q98 320 106 320 Z" fill="#eceef2"/>
+  <text x="118" y="348" class="card-title">Configured judge</text>
+  <text x="118" y="389" class="body">Prompt · rubric · model ·</text>
+  <text x="118" y="411" class="body">schema · threshold</text>
+
+  <rect x="98" y="462" width="244" height="126" rx="8" fill="#ffffff" stroke="#91a1b5" stroke-width="1.6"/>
+  <path d="M106 462 H334 Q342 462 342 470 V502 H98 V470 Q98 462 106 462 Z" fill="#eceef2"/>
+  <text x="118" y="490" class="card-title">Evaluation items</text>
+  <text x="118" y="521" class="body">Complete judged transcripts</text>
+  <text x="118" y="547" class="mono">input · output</text>
+
+  <text x="98" y="616" class="small">The graded system is not rerun.</text>
+
+  <!-- CENTER: engine -->
+  <rect x="430" y="190" width="742" height="492" rx="14" fill="#ffffff" stroke="#cfd8e3" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="462" y="228" class="eyebrow">AUDIT ENGINE</text>
+  <text x="462" y="262" class="section">Two lanes, one pipeline</text>
+  <text x="462" y="290" class="small">Explicit selections; only applicable, accepted edits reach the judge.</text>
+
+  <!-- lane chips -->
+  <rect x="462" y="306" width="338" height="62" rx="9" fill="#ffffff" stroke="#249056" stroke-width="1.5"/>
+  <text x="484" y="333" class="lane-title title-green">Invariant lane</text>
+  <text x="484" y="354" class="small">Meaning preserved · <tspan class="mono">same_verdict</tspan></text>
+
+  <rect x="812" y="306" width="338" height="62" rx="9" fill="#ffffff" stroke="#b86b2b" stroke-width="1.5"/>
+  <text x="834" y="333" class="lane-title title-orange">Directional lane · pointwise</text>
+  <text x="834" y="354" class="small">Quality degraded · <tspan class="mono">worse_verdict</tspan></text>
+
+  <!-- baseline (control, established once) -->
+  <text x="462" y="402" class="small"><tspan style="font-weight:800;fill:#405064">Repeat originals × N</tspan> · noise and directional eligibility</text>
+
+  <!-- pipeline header (dark anchor) -->
+  <rect x="462" y="424" width="228" height="26" rx="13" fill="#10233f"/>
+  <text x="477" y="442" class="chip-label">THE PERTURBATION PIPELINE</text>
+
+  <!-- stacked deck (repetition) -->
+  <rect x="468" y="478" width="692" height="176" rx="12" fill="#dbe3ee" stroke="#cad4e1" stroke-width="1.4"/>
+  <rect x="460" y="470" width="692" height="176" rx="12" fill="#e6ecf4" stroke="#d2dbe6" stroke-width="1.4"/>
+  <rect x="452" y="462" width="692" height="176" rx="12" fill="#eef2f7" stroke="#cdd6e1" stroke-width="1.5" filter="url(#shadow)"/>
+
+  <text x="470" y="486" class="tiny">BUILD BY SCOPE; JUDGE ACCEPTED ITEM/VARIANT PAIRS</text>
+
+  <!-- step 1: build -->
+  <rect x="466" y="504" width="196" height="112" rx="9" fill="#ffffff" stroke="#64748b" stroke-width="1.6"/>
+  <circle cx="492" cy="536" r="16" fill="#10233f"/>
+  <text x="492" y="541" text-anchor="middle" class="badge">1</text>
+  <text x="518" y="541" class="card-title" fill="#10233f">Build variant</text>
+  <text x="474" y="572" class="small">Once per judge or item,</text>
+  <text x="474" y="592" class="small">by rule or LLM.</text>
+
+  <!-- step 2: validate -->
+  <rect x="706" y="504" width="196" height="112" rx="9" fill="#ffffff" stroke="#64748b" stroke-width="1.6"/>
+  <circle cx="732" cy="536" r="16" fill="#10233f"/>
+  <text x="732" y="541" text-anchor="middle" class="badge">2</text>
+  <text x="758" y="541" class="card-title" fill="#10233f">Validate</text>
+  <text x="714" y="572" class="small">Structural guard or</text>
+  <text x="714" y="592" class="small">semantic validation</text>
+
+  <!-- step 3: judge -->
+  <rect x="946" y="504" width="188" height="112" rx="9" fill="#ffffff" stroke="#64748b" stroke-width="1.6"/>
+  <circle cx="972" cy="536" r="16" fill="#10233f"/>
+  <text x="972" y="541" text-anchor="middle" class="badge">3</text>
+  <text x="998" y="541" class="card-title" fill="#10233f">Judge × N</text>
+  <text x="954" y="572" class="small">Accepted applications</text>
+  <text x="954" y="592" class="small">only, N repeats</text>
+
+  <text x="462" y="673" class="small">Pairwise: invariants only, including candidate-position swaps.</text>
+
+  <!-- handoff arrows (consuming outputs) -->
+  <g stroke="#64748b" stroke-width="2.5" marker-end="url(#arrowsm)" fill="none">
+    <line x1="666" y1="560" x2="700" y2="560"/>
+    <line x1="906" y1="560" x2="940" y2="560"/>
+  </g>
+
+  <!-- RIGHT: report answers -->
+  <rect x="1230" y="214" width="320" height="420" rx="12" fill="#ffffff" stroke="#cfd8e3" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1256" y="253" class="eyebrow">REPORT</text>
+  <text x="1256" y="288" class="section">What evidence says</text>
+
+  <rect x="1256" y="320" width="268" height="90" rx="8" fill="#ffffff" stroke="#249056" stroke-width="1.5"/>
+  <text x="1276" y="351" class="lane-title title-green">Invariant stability</text>
+  <text x="1276" y="376" class="body">Do meaning-preserving edits</text>
+  <text x="1276" y="396" class="body">flip verdicts?</text>
+
+
+  <rect x="1256" y="424" width="268" height="90" rx="8" fill="#ffffff" stroke="#b86b2b" stroke-width="1.5"/>
+  <text x="1276" y="455" class="lane-title title-orange">Degradation detection</text>
+  <text x="1276" y="490" class="body">Do worse variants get penalized?</text>
+
+  <rect x="1256" y="528" width="268" height="90" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+  <text x="1276" y="559" class="lane-title title-navy">Agrees with ground truth</text>
+  <text x="1276" y="594" class="body">Do verdicts match trusted labels?</text>
+</svg>

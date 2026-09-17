@@ -1,0 +1,651 @@
+{% extends "layout.html" %}
+{% block title %}Report · MAWILE{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow"><svg class="icon sm"><use href="#i-bar"/></svg> Audit Results</p>
+    <h1>MAWILE Report</h1>
+  </div>
+  <div class="head-actions">
+    {% if run_artifacts %}
+      <div class="run-picker">
+        <span>Run</span>
+        <form method="get" action="/report" class="inline-form">
+          <select name="run" onchange="this.form.submit()" aria-label="Run history">
+            {% for run in run_artifacts %}
+              <option value="{{ run.run_id }}" title="{{ run.path_label }}" {{ 'selected' if run.run_id == bundle.run_id else '' }}>{{ run.label }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    {% endif %}
+    <a class="button" href="/artifacts/{{ bundle.run_id }}/report"><svg class="icon sm"><use href="#i-external"/></svg> Export Report</a>
+  </div>
+</div>
+
+{% if artifact.get('replay') %}
+  {% set replay = artifact['replay'] %}
+  <div class="alert compact">
+    <svg class="icon"><use href="#i-info"/></svg>
+    <div>
+      <strong>Saved-suite replay</strong>
+      <p>New judge measurements on the exact suite from <code>{{ replay.get('source_run_id') }}</code>.
+      Items, variants, and validation decisions were reused; planning, generation, and validation were not rerun.</p>
+      <p>Directional eligibility is frozen from the source baseline. Fresh baseline eligibility is diagnostic only.
+      Suite preparation costs are excluded from this run's cost.</p>
+      <p>Suite SHA-256: <code>{{ replay.get('suite_sha256') }}</code></p>
+    </div>
+  </div>
+{% endif %}
+
+{% set interpretation = artifact.get('report_interpretation') or {} %}
+<div class="kpi-grid">
+  {% for card in overview_cards %}
+    <div class="kpi">
+      <div class="kpi-label"><svg class="icon sm"><use href="#{{ card.icon }}"/></svg> {{ card.label }}</div>
+      <div class="kpi-value">{{ card.value }}</div>
+      <div class="kpi-caption">{{ card.caption }}</div>
+      {% if card.bar is not none %}
+        <div class="kpi-bar {{ 'warn' if card.tone == 'warn' else '' }}"><i style="width: {{ (card.bar * 100)|round(1) }}%"></i></div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+<section class="generated-summary">
+  <div class="generated-summary-head">
+    <div>
+      <p class="eyebrow"><svg class="icon sm"><use href="#i-sparkle"/></svg> Generated Summary</p>
+    </div>
+    {% if generated_summary_notice %}
+      <span class="summary-disclaimer">{{ generated_summary_notice }}</span>
+    {% endif %}
+  </div>
+  <div class="brief report-brief summary-brief">
+    <span class="brief-icon"><svg class="icon"><use href="#i-info"/></svg></span>
+    <div>
+      <p class="eyebrow">Executive Brief</p>
+      <p>{{ interpretation.get('executive_summary') or 'No generated summary is available for this run.' }}</p>
+    </div>
+  </div>
+  {% if report_action_panels %}
+    <div class="report-actions">
+      {% for panel in report_action_panels %}
+        <article class="action-card">
+          <div class="action-card-head">
+            <svg class="icon sm"><use href="#{{ panel.icon }}"/></svg>
+            <h2>{{ panel.title }}</h2>
+          </div>
+          <ul>
+            {% for item in panel["items"] %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+<nav class="tabs" aria-label="Report sections">
+  <a href="#tab-overview" data-tab="tab-overview" class="active">Overview</a>
+  <a href="#tab-evidence" data-tab="tab-evidence">Evidence</a>
+  <a href="#tab-review" data-tab="tab-review">Review Queue</a>
+  <a href="#tab-details" data-tab="tab-details">Audit Details</a>
+</nav>
+
+<section id="tab-overview" class="tab-panel">
+  <div class="dash-grid">
+    <article class="panel span-6">
+      <div class="panel-head">
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-bar"/></svg> Invariant Stability</p>
+        <h2>Flip rate by invariant perturbation</h2>
+      </div>
+      {% set shown = summaries[:8] %}
+      {% if shown %}
+        {% set available_rates = shown|selectattr('flip_rate', 'ne', none)|map(attribute='flip_rate')|list %}
+        {% set maxrate = (available_rates + [noise_flip_rate or 0, 0.01])|max %}
+        <ul class="hbars">
+          {% for s in shown %}
+            <li class="hbar">
+              <span class="hbar-label"><span class="pill t-{{ s.family|family_accent }}">{{ s.family|family_label }}</span><strong>{{ s.dimension }}</strong></span>
+              <span class="hbar-track">
+                {% if s.flip_rate is not none %}<i style="width: {{ (s.flip_rate / maxrate * 100)|round(1) }}%; background: var(--{{ s.family|family_accent }})"></i>{% else %}<span class="muted">Unavailable</span>{% endif %}
+                {% if noise_flip_rate %}<span class="hbar-noise" style="left: {{ (noise_flip_rate / maxrate * 100)|round(1) }}%"></span>{% endif %}
+              </span>
+              <span class="hbar-val">{{ s.flip_rate|fmt_float }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="chart-legend">
+          <span><span class="legend-swatch" style="background: var(--primary)"></span> Flip rate</span>
+          {% if noise_flip_rate %}<span><span class="legend-swatch" style="background: var(--warning)"></span> Noise floor ({{ noise_flip_rate|fmt_float }})</span>{% endif %}
+        </div>
+      {% else %}
+        <p class="muted">No invariant perturbation instability was recorded.</p>
+      {% endif %}
+    </article>
+    <article class="panel span-6">
+      <div class="panel-head">
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-trend-down"/></svg> Directional Perturbations <a class="metric-doc-link" href="/catalog#directional-detection-docs">Docs</a></p>
+      </div>
+      {% set directional_eligibility = directional.get('eligibility') or {} %}
+      {% if directional.has_directional %}
+        <div class="metric-strip compact">
+          <div><b>{{ directional.num_cases }}</b><span>Cases</span></div>
+          {% if directional.get('degradation_detection_rate') is not none %}
+            <div><b>{{ directional.degradation_detection_rate|fmt_float }}</b><span>Degradation detection</span></div>
+          {% endif %}
+          {% if directional.get('noise_adjusted_detection_rate') is not none %}
+            <div><b>{{ directional.noise_adjusted_detection_rate|fmt_float }}</b><span>Noise-adjusted</span></div>
+          {% endif %}
+          {% if directional.get('contradiction_rate') is not none %}
+            <div><b>{{ directional.contradiction_rate|fmt_float }}</b><span>Contradiction</span></div>
+          {% endif %}
+        </div>
+        {% set directional_rows = (directional.operator_summaries or [])[:6] %}
+        {% if directional_rows %}
+          <ul class="hbars compact-bars">
+            {% for row in directional_rows %}
+              <li class="hbar">
+                <span class="hbar-label"><span class="pill t-{{ row.family|family_accent }}">{{ row.family|family_label }}</span><strong>{{ row.dimension or row.operator }}</strong></span>
+                <span class="hbar-track">
+                  {% if row.degradation_detection_rate is not none %}<i style="width: {{ [((row.degradation_detection_rate * 100)|round(1)), 100]|min }}%; background: var(--{{ row.family|family_accent }})"></i>{% endif %}
+                </span>
+                <span class="hbar-val">{{ row.degradation_detection_rate|fmt_float }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if not directional.score_supported and directional.label_movement %}
+          <div class="metric-strip compact">
+            <div><b>{{ directional.label_movement.unchanged }}</b><span>Unchanged</span></div>
+            <div><b>{{ directional.label_movement.improved }}</b><span>Improved</span></div>
+            <div><b>{{ directional.label_movement.unknown }}</b><span>Unanalyzable</span></div>
+          </div>
+          <p class="muted">Detection compares canonical classes; noise adjustment discounts the item's baseline label-flip rate. Signed score shift and threshold crossing need a numeric judge.</p>
+        {% endif %}
+      {% elif directional_eligibility.get('directional_requested') %}
+        <p class="muted">No directional cases are available. Check baseline eligibility, applicability, validation, and judge-call coverage. {{ directional_eligibility.get('ineligible_item_count', 0) }} item(s) were excluded by baseline eligibility, including missing baselines or verdicts within the floor margin.</p>
+      {% else %}
+        <p class="muted">Directional perturbations were not run in this audit.</p>
+      {% endif %}
+    </article>
+    {% if equivariant.has_equivariant %}
+    <article class="panel span-6">
+      <div class="panel-head">
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-activity"/></svg> Pairwise Positions</p>
+        <h2>Candidate identity after A/B swap</h2>
+      </div>
+      <div class="metric-strip compact">
+        <div><b>{{ equivariant.num_cases }}</b><span>Swap cases</span></div>
+        <div><b>{{ equivariant.candidate_identity_consistency_rate|fmt_float }}</b><span>Identity consistency</span></div>
+        <div><b>{{ equivariant.position_inversion_rate|fmt_float }}</b><span>A/B inversion</span></div>
+        <div><b>{{ equivariant.first_position_selection_rate|fmt_float }}</b><span>First-position choice</span></div>
+      </div>
+      <p class="muted">Identity consistency compares the majority candidate ID before and after a swap. A/B inversion compares majority display positions. First-position choice is the share of valid position verdicts selecting A across original and swapped calls. Candidate identity, not display position, determines whether the preferred answer stays the same.</p>
+    </article>
+    {% endif %}
+    <article class="panel {{ 'span-8' if correctness.has_gold_labels else 'span-4' }}">
+      <div class="panel-head">
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-target"/></svg> Gold Labels</p>
+        <h2>Validity against trusted labels</h2>
+      </div>
+      {% if correctness.has_gold_labels %}
+        <div class="stat-grid">
+          <div class="stat-card"><span>Labeled items</span><b>{{ correctness.labeled_items }}</b></div>
+          {% if correctness.get('accuracy') is not none %}
+            <div class="stat-card"><span>Accuracy</span><b>{{ correctness.accuracy|fmt_float }}</b></div>
+          {% endif %}
+          {% if correctness.get('error_rate') is not none %}
+            <div class="stat-card"><span>Error rate</span><b>{{ correctness.error_rate|fmt_float }}</b></div>
+          {% endif %}
+          {% if correctness.get('mean_absolute_score_error') is not none %}
+            <div class="stat-card"><span>Score MAE</span><b>{{ correctness.mean_absolute_score_error|fmt_float }}</b></div>
+          {% endif %}
+          {% if correctness.get('rank_correlation') is not none %}
+            <div class="stat-card"><span>Spearman rank</span><b>{{ correctness.rank_correlation|fmt_float }}</b></div>
+          {% endif %}
+          {% if correctness.get('tolerance') is not none %}
+            <div class="stat-card"><span>Gold tolerance</span><b>{{ correctness.tolerance|fmt_float }}</b></div>
+          {% endif %}
+        </div>
+        {% if confusion.rows %}
+          <h3>Confusion matrix</h3>
+          <div class="table-wrap compact-table">
+            <table class="heatmap">
+              <thead>
+                <tr><th></th>{% for pred in confusion.pred_labels %}<th>{{ pred }}</th>{% endfor %}</tr>
+              </thead>
+              <tbody>
+                {% for row in confusion.rows %}
+                  <tr>
+                    <th class="rowhead">{{ row.gold }}</th>
+                    {% for cell in row.cells %}
+                      <td class="{{ 'hot' if cell.intensity > 0.55 else '' }}" style="background: rgba(47, 125, 99, {{ cell.intensity }})">{{ cell.count }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      {% else %}
+        <p class="muted">Accuracy was not tested because no gold labels were supplied.</p>
+      {% endif %}
+    </article>
+    <article class="panel {{ 'span-4' if correctness.has_gold_labels else 'span-8' }}">
+      <div class="panel-head">
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-activity"/></svg> Evidence Quality</p>
+        <h2>Run health</h2>
+      </div>
+      <div class="metric-strip">
+        <div><b>{{ quality.transport_failures }}</b><span>Transport failures</span></div>
+        <div><b>{{ quality.parse_errors }}</b><span>Parse errors</span></div>
+        <div><b>{{ quality.analyzable_verdicts }} / {{ quality.judge_calls_attempted }}</b><span>Analyzable calls</span></div>
+        <div><b>{{ quality.parse_rate|fmt_float }}</b><span>Parse rate</span></div>
+        <div><b>{{ quality.judge_errors }}</b><span>Gold mismatches</span></div>
+        <div><b>{{ quality.validation_summary }}</b><span>Validation</span></div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section id="tab-evidence" class="tab-panel" hidden>
+  <div class="panel">
+    <div class="panel-head split">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-zap"/></svg> Evidence</p>
+        <h2>Invariant perturbation explorer</h2>
+      </div>
+      {% if summaries %}
+        <form method="get" action="/report#tab-evidence" class="inline-form">
+          <input type="hidden" name="run" value="{{ bundle.run_id }}">
+          {% if selected_directional_row %}<input type="hidden" name="directional_operator" value="{{ selected_directional_row.operator }}">{% endif %}
+          <label>Type
+            <select name="operator" onchange="this.form.submit()">
+              {% for summary in summaries %}
+                <option value="{{ summary.operator }}" {{ 'selected' if selected_type and selected_type.operator == summary.operator else '' }}>{{ summary.dimension }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </form>
+      {% endif %}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Family</th><th>Type</th><th>Changed fields</th><th>Results</th><th>Items</th><th>Flip rate</th><th>Signed shift</th></tr></thead>
+        <tbody>
+          {% for summary in summaries %}
+            <tr>
+              <td><span class="pill t-{{ summary.family|family_accent }}">{{ summary.family|family_label }}</span></td>
+              <td><strong>{{ summary.dimension }}</strong><br><code>{{ summary.operator }}</code></td>
+              <td>{{ summary.changed_fields|join(', ') }}</td>
+              <td class="num">{{ summary.num_results }}</td>
+              <td class="num">{{ summary.num_items }}</td>
+              <td class="num cell-bar">{% if summary.flip_rate is not none %}<i style="width: {{ [((summary.flip_rate * 100)|round(0)|int), 100]|min }}%"></i>{% endif %}<span class="val">{{ summary.flip_rate|fmt_float }}</span></td>
+              <td class="num">{{ summary.mean_signed_shift|fmt_signed }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">No invariant perturbation examples were recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if selected_type and selected_example %}
+      <div class="evidence-detail">
+        <div class="stat-grid">
+          {% if selected_type.flip_rate is not none %}
+            <div class="stat-card"><span>Type flip rate</span><b>{{ selected_type.flip_rate|fmt_float }}</b></div>
+          {% endif %}
+          <div class="stat-card"><span>Flipped</span><b>{{ 'Yes' if selected_example.flipped is true else ('No' if selected_example.flipped is false else 'Unavailable') }}</b></div>
+          {% if selected_example.baseline_label %}
+            <div class="stat-card"><span>Baseline</span><b>{{ selected_example.baseline_label }}</b></div>
+          {% endif %}
+          {% if selected_example.perturbed_label %}
+            <div class="stat-card"><span>Perturbed</span><b>{{ selected_example.perturbed_label }}</b></div>
+          {% endif %}
+          {% if selected_example.score_delta is not none %}
+            <div class="stat-card"><span>Score change</span><b>{{ selected_example.score_delta|fmt_signed }}</b></div>
+          {% endif %}
+        </div>
+        <p class="muted">{{ selected_example.summary }}</p>
+        <div class="diff-grid">
+          <div><span>Before · {{ selected_example.changed_field or 'n/a' }}</span><pre>{{ selected_example.before }}</pre></div>
+          <div><span>After</span><pre>{{ selected_example.after }}</pre></div>
+        </div>
+        {% if example_trials|length > 1 %}
+          <p class="muted">This item has {{ example_trials|length }} repeated judge trials for the selected perturbation.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <div class="panel-head split">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-trend-down"/></svg> Directional Perturbations <a class="metric-doc-link" href="/catalog#directional-detection-docs">Docs</a></p>
+        <h2>Degradation detection by operator</h2>
+      </div>
+      {% if directional.operator_summaries %}
+        <form method="get" action="/report#tab-evidence" class="inline-form">
+          <input type="hidden" name="run" value="{{ bundle.run_id }}">
+          {% if selected_type %}<input type="hidden" name="operator" value="{{ selected_type.operator }}">{% endif %}
+          <label>Type
+            <select name="directional_operator" onchange="this.form.submit()">
+              {% for row in directional.operator_summaries %}
+                <option value="{{ row.operator }}" {{ 'selected' if selected_directional_row and selected_directional_row.operator == row.operator else '' }}>{{ row.dimension or row.operator }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </form>
+      {% endif %}
+    </div>
+    {% if directional.has_directional %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Operator</th><th>Changed fields</th><th>Cases</th><th>Detection</th><th>Noise-adjusted</th><th>Threshold</th><th>Contradiction</th><th>Delta</th></tr></thead>
+          <tbody>
+            {% for row in directional.operator_summaries %}
+              <tr>
+                <td><strong>{{ row.dimension or row.operator }}</strong><br><code>{{ row.operator }}</code></td>
+                <td>{{ row.changed_fields|join(', ') }}</td>
+                <td class="num">{{ row.num_cases }}</td>
+                <td class="num cell-bar">{% if row.degradation_detection_rate is not none %}<i style="width: {{ [((row.degradation_detection_rate * 100)|round(0)|int), 100]|min }}%"></i>{% endif %}<span class="val">{{ row.degradation_detection_rate|fmt_float }}</span></td>
+                <td class="num">{{ row.noise_adjusted_detection_rate|fmt_float }}</td>
+                <td class="num">{{ row.threshold_worsening_rate|fmt_float }}</td>
+                <td class="num">{{ row.contradiction_rate|fmt_float }}</td>
+                <td class="num">{{ row.mean_score_delta|fmt_signed }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if selected_directional_row and selected_directional_example %}
+        <div class="evidence-detail">
+          <div class="stat-grid">
+            {% if selected_directional_row.get('degradation_detection_rate') is not none %}
+              <div class="stat-card"><span>Operator detection</span><b>{{ selected_directional_row.degradation_detection_rate|fmt_float }}</b></div>
+            {% endif %}
+            {% if selected_directional_example.detected is not none %}
+              <div class="stat-card"><span>Degradation detected</span><b>{{ 'Yes' if selected_directional_example.detected else 'No' }}</b></div>
+            {% endif %}
+            {% if selected_directional_example.baseline_label %}
+              <div class="stat-card"><span>Baseline</span><b>{{ selected_directional_example.baseline_label }}</b></div>
+            {% endif %}
+            {% if selected_directional_example.perturbed_label %}
+              <div class="stat-card"><span>Perturbed</span><b>{{ selected_directional_example.perturbed_label }}</b></div>
+            {% endif %}
+            {% if selected_directional_example.score_delta is not none %}
+              <div class="stat-card"><span>Score change</span><b>{{ selected_directional_example.score_delta|fmt_signed }}</b></div>
+            {% endif %}
+          </div>
+          <p class="muted">{{ selected_directional_example.summary }}</p>
+          <div class="diff-grid">
+            <div><span>Before · {{ selected_directional_example.changed_field or 'n/a' }}</span><pre>{{ selected_directional_example.before }}</pre></div>
+            <div><span>After</span><pre>{{ selected_directional_example.after }}</pre></div>
+          </div>
+          {% if directional_example_trials|length > 1 %}
+            <p class="muted">This item has {{ directional_example_trials|length }} repeated judge trials for the selected perturbation.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if directional.top_missed_degradations %}
+        <h3>Top missed degradations</h3>
+        <div class="table-wrap compact-table">
+          <table>
+            <thead><tr><th>Item</th><th>Operator</th><th>Movement</th><th>Baseline</th><th>Perturbed</th><th>Delta</th><th>Noise floor</th></tr></thead>
+            <tbody>
+              {% for row in directional.top_missed_degradations %}
+                <tr><td><a href="/report?run={{ bundle.run_id }}&item={{ row.item_id }}#tab-review"><code>{{ row.item_id }}</code></a></td><td><code>{{ row.operator }}</code></td><td>{{ row.label_movement or 'n/a' }}</td><td>{{ row.baseline_score|fmt_float if row.baseline_score is not none else row.baseline_label }}</td><td>{{ row.perturbed_score|fmt_float if row.perturbed_score is not none else row.perturbed_label }}</td><td>{{ row.score_delta|fmt_signed }}</td><td>{{ row.noise_flip_rate|fmt_float if row.detection_basis == 'label' else row.noise_score_sd|fmt_float }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">Directional perturbations were not run in this audit.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section id="tab-review" class="tab-panel" hidden>
+  <div class="panel">
+    <div class="panel-head split">
+      <div>
+        <p class="eyebrow"><svg class="icon sm"><use href="#i-activity"/></svg> Review Queue</p>
+        <h2>Highest-risk items</h2>
+      </div>
+      {% if item_risks %}
+        <form method="get" action="/report#tab-review" class="inline-form">
+          <input type="hidden" name="run" value="{{ bundle.run_id }}">
+          <label>Review item
+            <select name="item" onchange="this.form.submit()">
+              {% for risk in item_risks %}
+                <option value="{{ risk.item_id }}" {{ 'selected' if selected_risk and selected_risk.item_id == risk.item_id else '' }}>#{{ risk.review_rank }} {{ risk.item_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </form>
+      {% endif %}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Rank</th><th>Item</th><th>Verdict</th><th>Why</th><th>Flip risk</th><th>Directional</th><th>Noise</th><th>Boundary</th><th>Gold</th></tr></thead>
+        <tbody>
+          {% for risk in top_routes %}
+            <tr>
+              <td class="num">{{ risk.review_rank }}</td>
+              <td><code>{{ risk.item_id }}</code></td>
+              <td><span class="badge">{{ risk.original_verdict }}</span></td>
+              <td>{% for reason in risk.reasons %}<span class="chip {{ 'alert' if reason in ('gold mismatch', 'directional contradiction', 'missed degradation') else '' }}">{{ reason }}</span>{% endfor %}</td>
+              <td class="num cell-bar">{% if risk.invariant_flip_risk is not none %}<i style="width: {{ [((risk.invariant_flip_risk * 100)|round(0)|int), 100]|min }}%"></i>{% endif %}<span class="val">{{ risk.invariant_flip_risk|fmt_float }}</span></td>
+              <td class="num" {% if risk.directional_cases %}title="missed {{ risk.directional_missed }} of {{ risk.directional_cases }} directional case{{ '' if risk.directional_cases == 1 else 's' }}"{% endif %}>{{ risk.directional_risk|fmt_float }}</td>
+              <td class="num">{{ risk.noise_risk|fmt_float }}</td>
+              <td class="num">{{ risk.boundary_proximity|fmt_float }}</td>
+              <td>{% if risk.gold_label is not none %}<span class="{{ 'gold-mismatch' if risk.judge_error else '' }}">{{ risk.gold_label }}</span>{% else %}n/a{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="9">No item risks were recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if item_risks|length > top_routes|length %}
+      <p class="muted">Showing the top {{ top_routes|length }} of {{ item_risks|length }} ranked items; use the selector to inspect any item.</p>
+    {% endif %}
+    {% if correctness.review_utility %}
+      <p class="muted">Against gold labels, routing the top {{ correctness.review_utility.top_k }} items reached precision {{ correctness.review_utility.routed_precision|fmt_float }} and captured {{ correctness.review_utility.error_capture_rate|fmt_float }} of judge errors.</p>
+    {% endif %}
+    {% if selected_risk %}
+      <div class="evidence-detail">
+        <h3>Item {{ selected_risk.item_id }}</h3>
+        <div class="stat-grid">
+          {% if selected_risk.get('invariant_flip_risk') is not none %}
+            <div class="stat-card"><span>Flip risk</span><b>{{ selected_risk.invariant_flip_risk|fmt_float }}</b></div>
+          {% endif %}
+          {% if selected_risk.get('noise_risk') is not none %}
+            <div class="stat-card"><span>Noise</span><b>{{ selected_risk.noise_risk|fmt_float }}</b></div>
+          {% endif %}
+          {% if selected_risk.get('boundary_proximity') is not none %}
+            <div class="stat-card"><span>Boundary</span><b>{{ selected_risk.boundary_proximity|fmt_float }}</b></div>
+          {% endif %}
+          {% if selected_risk.get('directional_cases') %}
+            {% if selected_risk.get('directional_risk') is not none %}
+              <div class="stat-card"><span>Directional risk</span><b>{{ selected_risk.directional_risk|fmt_float }}</b></div>
+            {% endif %}
+            <div class="stat-card"><span>Missed degradations</span><b>{{ selected_risk.directional_missed }} / {{ selected_risk.directional_cases }}</b></div>
+            <div class="stat-card"><span>Contradictions</span><b>{{ selected_risk.directional_contradictions }}</b></div>
+          {% endif %}
+          {% if selected_risk.gold_label is not none %}
+            <div class="stat-card"><span>Gold label</span><b class="{{ 'gold-mismatch' if selected_risk.judge_error else '' }}">{{ selected_risk.gold_label }}</b></div>
+          {% endif %}
+        </div>
+        {% if selected_risk.family_risks or selected_risk.family_signed_shifts %}
+          <div class="table-wrap compact-table">
+            <table>
+              <thead><tr><th>Family</th><th>Risk</th><th>Signed shift</th></tr></thead>
+              <tbody>
+                {% for family, value in selected_risk.family_risks.items() %}
+                  <tr><td><span class="pill t-{{ family|family_accent }}">{{ family|family_label }}</span></td><td>{{ value|fmt_float }}</td><td>{{ selected_risk.family_signed_shifts.get(family)|fmt_signed }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+        <details>
+          <summary>Judge calls for this item</summary>
+          <div class="table-wrap compact-table">
+            <table>
+              <thead><tr><th>Variant</th><th>Check</th><th>Run</th><th>Label</th><th>Score</th><th>Parse</th></tr></thead>
+              <tbody>
+                {% for result in selected_judge_results(artifact, selected_risk.item_id) %}
+                  <tr><td><code>{{ result.variant_id }}</code></td><td>{{ result.check_label }}</td><td>{{ result.run_id }}</td><td>{{ result_label(result) }}</td><td>{{ result_score(result) }}</td><td>{{ result.parse_status }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<section id="tab-details" class="tab-panel" hidden>
+  {% if cost_category_rows %}
+  <details class="disclosure" open>
+    <summary>
+      <span class="summary-icon"><svg class="icon sm"><use href="#i-file"/></svg></span>
+      <span class="summary-text"><span class="eyebrow">LLM Cost Breakdown</span><h2>Calls and token usage by phase</h2></span>
+      <span class="summary-note">{{ '≥ ' if not cost_pricing_complete else '' }}{{ cost_total_label }}</span>
+      <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+    </summary>
+    <div class="disclosure-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Phase</th><th>Calls</th><th>Input</th><th>Cached</th><th>Cache writes</th><th>Output</th><th>USD</th></tr>
+          </thead>
+          <tbody>
+            {% for row in cost_category_rows %}
+              <tr>
+                <td><strong>{{ row.label }}</strong></td>
+                <td class="num">{{ row.calls }}</td>
+                <td class="num">{{ row.input_tokens }}</td>
+                <td class="num">{{ row.cached_input_tokens }}</td>
+                <td class="num">{{ row.cache_write_tokens }}</td>
+                <td class="num">{{ row.output_tokens }}</td>
+                <td class="num">{{ '≥ ' if not row.pricing_complete else '' }}{{ row.total_usd }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if cost_pricing_note %}
+        <p class="muted"><strong>Pricing incomplete.</strong> {{ cost_pricing_note }}</p>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  <details class="disclosure" open>
+    <summary>
+      <span class="summary-icon"><svg class="icon sm"><use href="#i-shield"/></svg></span>
+      <span class="summary-text"><span class="eyebrow">Operator Manifest</span><h2>Chosen perturbations and validation</h2></span>
+      {% set check_count = (operator_manifest.operators or [])|length %}
+      <span class="summary-note">{{ check_count }} check{{ '' if check_count == 1 else 's' }}</span>
+      <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+    </summary>
+    <div class="disclosure-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Check</th><th>Changes</th><th>Expected response</th><th>Validation</th></tr></thead>
+        <tbody>
+          {% for row in operator_manifest.operators or [] %}
+            <tr>
+              <td><strong>{{ row.dimension }}</strong><br><code>{{ row.operator }}</code></td>
+              <td><code>{{ row.target }}</code>{% if row.touches %}<br><span class="muted">{{ row.touches|join(', ') }}</span>{% endif %}</td>
+              <td>{{ row.expected_relation|title_label }}<br><span class="muted">{{ row.expected_effect|title_label }}</span></td>
+              <td><span class="validation-label">{{ row.validation_kind|validation_label }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No chosen perturbations were recorded for this audit.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <h3>Run ledger</h3>
+    <div class="table-wrap">
+      {% set canonical_ledger = ledger and (ledger[0].generation_units is defined or ledger[0].unique_variants is defined) %}
+      <table>
+        {% if canonical_ledger %}
+        <thead><tr><th>Check</th><th>Expected response</th><th>Generation units</th><th>Generation status</th><th>Applications</th><th>Application status</th><th>Unique variants</th><th>Accepted variants</th><th>Rejected variants</th><th>Unavailable variants</th><th>Validation</th></tr></thead>
+        {% else %}
+        <thead><tr><th>Check</th><th>Expected response</th><th>Attempted</th><th>Accepted</th><th>Rejected</th><th>Skipped</th><th>Validation</th></tr></thead>
+        {% endif %}
+        <tbody>
+          {% for row in ledger %}
+            {% if canonical_ledger %}
+            <tr>
+              <td><strong>{{ row.dimension or row.operator }}</strong><br><code>{{ row.operator }}</code></td>
+              <td>{{ row.expected_relation|title_label }}<br><span class="muted">{{ row.expected_effect|title_label }}</span></td>
+              <td class="num">{{ row.generation_units or 0 }}</td>
+              <td><code>{{ row.generation_statuses or {} }}</code></td>
+              <td class="num">{{ row.applications or 0 }}</td>
+              <td><code>{{ row.application_statuses or {} }}</code></td>
+              <td class="num">{{ row.unique_variants or 0 }}</td>
+              <td class="num">{{ row.accepted_variants or 0 }}</td>
+              <td class="num">{{ row.rejected_variants or 0 }}</td>
+              <td class="num">{{ row.unavailable_variants or 0 }}</td>
+              <td><span class="validation-label">{{ row.validation_kind|validation_label }}</span></td>
+            </tr>
+            {% else %}
+            <tr>
+              <td><strong>{{ row.dimension or row.operator }}</strong><br><code>{{ row.operator }}</code></td>
+              <td>{{ row.expected_relation|title_label }}<br><span class="muted">{{ row.expected_effect|title_label }}</span></td>
+              <td class="num">{{ row.attempted }}</td>
+              <td class="num">{{ row.accepted }}</td>
+              <td class="num">{{ row.rejected }}</td>
+              <td>{{ row.skipped_reason or '' }}</td>
+              <td><span class="validation-label">{{ row.validation_kind|validation_label }}</span></td>
+            </tr>
+            {% endif %}
+          {% else %}
+            <tr><td colspan="{{ 11 if canonical_ledger else 7 }}">No run ledger rows were recorded for this audit.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
+
+  <details class="disclosure quiet">
+    <summary>
+      <span class="summary-text"><span class="eyebrow">Artifacts and Markdown</span></span>
+      <span class="summary-note">{{ artifact_links|length }} downloads</span>
+      <svg class="icon summary-chevron"><use href="#i-chevron"/></svg>
+    </summary>
+    <div class="disclosure-body">
+    <dl class="run-meta">
+      <div>
+        <dt>Run</dt>
+        <dd><code>{{ bundle.run_id }}</code></dd>
+      </div>
+      <div>
+        <dt>Run path</dt>
+        <dd title="{{ bundle.run_dir }}">{{ bundle_run_dir_label }}</dd>
+      </div>
+    </dl>
+    <div class="artifact-grid">
+      {% for link in artifact_links %}
+        <a class="artifact-link" href="/artifacts/{{ bundle.run_id }}/{{ link.key }}"><svg class="icon sm"><use href="#i-download"/></svg> {{ link.label }}</a>
+      {% endfor %}
+    </div>
+    <details>
+      <summary>Markdown report</summary>
+      <pre class="yaml-block">{{ bundle.report_text }}</pre>
+    </details>
+    </div>
+  </details>
+</section>
+{% endblock %}
