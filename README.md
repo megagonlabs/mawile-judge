@@ -383,3 +383,25 @@ price entry or token usage, the report marks pricing as incomplete and presents
 the known USD subtotal as a lower bound. Models without price entries are also
 listed under `unpriced_models`. The `mock` runner makes no paid model calls and
 reports no token usage.
+
+
+
+## Open Source Software (OSS) Components
+
+All OSS components used within the product are listed below (including their copyright holders and the license information).
+
+For OSS components having different portions released under different licenses, please refer to the included Upstream link(s) specified for each of the respective OSS components for identifications of code files released under the identified licenses.
+
+| ID | OSS Component Name | Modified | Copyright Holder | Upstream Link | License |
+| -: | ------------------ | :------: | ---------------- | ------------- | ------- |
+| 1 | fastapi | No | Sebastián Ramírez | [link](https://github.com/fastapi/fastapi) | [MIT License](https://github.com/fastapi/fastapi/blob/master/LICENSE) |
+| 2 | hatchling | No | Ofek Lev | [link](https://github.com/pypa/hatch/tree/master/backend) | [MIT License](https://github.com/pypa/hatch/blob/master/backend/LICENSE.txt) |
+| 3 | httpx | No | Encode OSS Ltd | [link](https://github.com/encode/httpx) | [BSD 3-Clause License](https://github.com/encode/httpx/blob/master/LICENSE.md) |
+| 4 | jinja2 | No | Pallets | [link](https://github.com/pallets/jinja) | [BSD 3-Clause License](https://github.com/pallets/jinja/blob/main/LICENSE.txt) |
+| 5 | openai | No | OpenAI | [link](https://github.com/openai/openai-python) | [Apache License 2.0](https://github.com/openai/openai-python/blob/main/LICENSE) |
+| 6 | pydantic | No | Pydantic Services Inc. and individual contributors | [link](https://github.com/pydantic/pydantic) | [MIT License](https://github.com/pydantic/pydantic/blob/main/LICENSE) |
+| 7 | python-dotenv | No | Saurabh Kumar, Ted Tieken, and Jacob Kaplan-Moss | [link](https://github.com/theskumar/python-dotenv) | [BSD 3-Clause License](https://github.com/theskumar/python-dotenv/blob/main/LICENSE) |
+| 8 | python-multipart | No | Andrew Dunham and contributors | [link](https://github.com/Kludex/python-multipart) | [Apache License 2.0](https://github.com/Kludex/python-multipart/blob/master/LICENSE.txt) |
+| 9 | PyYAML | No | Ingy döt Net and Kirill Simonov | [link](https://github.com/yaml/pyyaml) | [MIT License](https://github.com/yaml/pyyaml/blob/main/LICENSE) |
+| 10 | tqdm | No | Casper da Costa-Luis, Noam Yorav-Raphael, Google Inc., and other contributors | [link](https://github.com/tqdm/tqdm) | [MIT License and Mozilla Public License 2.0 (different portions)](https://github.com/tqdm/tqdm/blob/master/LICENCE) |
+| 11 | uvicorn | No | Encode OSS Ltd | [link](https://github.com/encode/uvicorn) | [BSD 3-Clause License](https://github.com/encode/uvicorn/blob/master/LICENSE.md) |
